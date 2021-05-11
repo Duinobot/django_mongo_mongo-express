@@ -1,0 +1,62 @@
+version: "3"
+volumes:
+  mongo:
+  media_vol:
+  static_vol:
+
+networks:
+  db_network:
+    driver: bridge
+  express_network:
+    driver: bridge
+
+services:
+  mongo:
+    image: mongo
+    ports:
+      - 27017:27017
+    volumes:
+      - mongo:/data/db
+    env_file:
+      - .env
+    networks:
+      - db_network
+    restart: always
+
+  mongoexpress:
+    image: mongo-express
+    volumes:
+      - ./compose/mongo-express-docker/docker-entrypoint.sh:/docker-entrypoint.sh
+    ports:
+      - 8081:8081
+    networks:
+      - db_network
+      - express_network
+    environment:
+      ME_CONFIG_MONGODB_SERVER: "mongo"
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      ME_CONFIG_BASICAUTH_USERNAME: ${ME_CONFIG_BASICAUTH_USERNAME}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${ME_CONFIG_BASICAUTH_PASSWORD}
+    depends_on:
+      - mongo
+    restart: always
+
+  web:
+    build: ./icompose
+    ports:
+      - 8000:8000
+    volumes:
+      - ./icompose:/var/www/html/icompose
+      - static_vol:/var/www/html/icompose/static
+      - media_vol:/var/www/html/icompose/media
+      - ./compose/uwsgi:/tmp
+    networks:
+      - db_network
+      - express_network
+    tty: true
+    stdin_open: true
+    depends_on:
+      - mongo
+      - mongoexpress
+    restart: always
